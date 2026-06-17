@@ -1,0 +1,232 @@
+---
+import Sidebar from '../components/Sidebar.astro';
+import UiIcon from '../components/UiIcon.astro';
+import globalStylesHref from '../styles/global.css?url';
+import { hasSiteUrl } from '../../site.config.mjs';
+import { createWithBase } from '../utils/format';
+import {
+  ADMIN_DEFAULT_SIDEBAR_NAV_MODE_STORAGE_KEY,
+  ADMIN_SHOW_TOP_NAV_STORAGE_KEY,
+  ADMIN_SIDEBAR_NAV_MODE_STORAGE_KEY
+} from '../lib/admin-console/ui-prefs-keys';
+import { getThemeSettings, type SidebarNavId } from '../lib/theme-settings';
+
+const {
+  title,
+  description,
+  image,
+  ogType = 'website',
+  bodyClass,
+  allowReadingMode = true,
+  deferGlobalStyles = false,
+  activeNavId,
+  adminSidebarScope = 'default'
+} = Astro.props as {
+  title?: string;
+  description?: string;
+  image?: string;
+  ogType?: string;
+  bodyClass?: string;
+  allowReadingMode?: boolean;
+  deferGlobalStyles?: boolean;
+  activeNavId?: SidebarNavId;
+  adminSidebarScope?: 'default' | 'page';
+};
+
+const { settings } = getThemeSettings();
+const siteTitle = settings.site.title;
+const brandTitle = settings.shell.brandTitle ?? siteTitle;
+const metaDescription = description ?? settings.site.description;
+const fullTitle = title ? `${title} | ${siteTitle}` : siteTitle;
+const htmlLang = settings.site.defaultLocale || 'zh-CN';
+const footerStartYear = settings.site.footer.startYear;
+const footerShowCurrentYear = settings.site.footer.showCurrentYear;
+const footerCopyright = settings.site.footer.copyright;
+const showCodeLineNumbers = settings.ui.codeBlock.showLineNumbers;
+const sidebarDividerVariant = settings.ui.layout.sidebarDivider;
+const canonical = (hasSiteUrl && Astro.site)
+  ? new URL(Astro.url.pathname, Astro.site).toString()
+  : null;
+const ogImage = image
+  ? ((hasSiteUrl && Astro.site) ? new URL(image, Astro.site).toString() : image)
+  : null;
+const currentYear = new Date().getFullYear();
+const yearRange = footerShowCurrentYear && currentYear > footerStartYear
+  ? `${footerStartYear}-${currentYear}`
+  : `${footerStartYear}`;
+const base = import.meta.env.BASE_URL ?? '/';
+const withBase = createWithBase(base);
+const bodyClassNames = typeof bodyClass === 'string' ? bodyClass.split(/\s+/).filter(Boolean) : [];
+const isAdminPage = bodyClassNames.includes('admin-page');
+const isDev = import.meta.env.DEV;
+const isDevAdminPage = isAdminPage && isDev;
+const adminDevState = isAdminPage ? (isDev ? 'true' : 'false') : undefined;
+const isPageScopedAdminSidebar = isAdminPage && adminSidebarScope === 'page';
+const shouldLoadAdminSidebarNavMode = isDev && !isPageScopedAdminSidebar;
+const devUiPrefsStylesHref = isDev && !isAdminPage
+  ? (await import('../styles/components/admin/dev-ui-prefs.css?url')).default
+  : null;
+const adminSidebarNavModeScriptHref = shouldLoadAdminSidebarNavMode
+  ? (await import('../scripts/admin-sidebar-nav-mode.ts?url')).default
+  : null;
+const adminUiPrefsScriptHref = isDevAdminPage
+  ? (await import('../scripts/admin-ui-prefs.ts?url')).default
+  : null;
+---
+
+<!doctype html>
+<html lang={htmlLang}>
+  <head>
+    <script is:inline>
+      (() => {
+        // 与 src/scripts/sidebar-theme.ts 保持同一主题偏好契约，避免首屏与运行时状态漂移。
+        const themeKey = 'theme';
+        const modeKey = 'theme-mode';
+        let storedMode = null;
+        let legacyTheme = null;
+        try {
+          storedMode = localStorage.getItem(modeKey);
+          legacyTheme = localStorage.getItem(themeKey);
+        } catch (_) {}
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const mode = storedMode === 'system' || storedMode === 'dark' || storedMode === 'light'
+          ? storedMode
+          : (legacyTheme === 'dark' || legacyTheme === 'light' ? legacyTheme : 'system');
+        const theme = mode === 'system' ? (prefersDark ? 'dark' : 'light') : mode;
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.dataset.themeMode = mode;
+      })();
+    </script>
+    {isDev ? (
+      <script
+        is:inline
+        define:vars={{
+          isAdminPage,
+          isPageScopedAdminSidebar,
+          defaultSidebarNavModeKey: ADMIN_DEFAULT_SIDEBAR_NAV_MODE_STORAGE_KEY,
+          sidebarNavModeKey: ADMIN_SIDEBAR_NAV_MODE_STORAGE_KEY,
+          showTopNavKey: ADMIN_SHOW_TOP_NAV_STORAGE_KEY
+        }}
+      >
+        (() => {
+          const root = document.documentElement;
+
+          if (!isPageScopedAdminSidebar) {
+            let storedNavMode = null;
+            let storedDefaultNavMode = null;
+            try { storedNavMode = sessionStorage.getItem(sidebarNavModeKey); } catch (_) {}
+            if (storedNavMode === 'admin' || storedNavMode === 'public') {
+              root.dataset.adminNavMode = storedNavMode;
+            } else {
+              try { storedDefaultNavMode = localStorage.getItem(defaultSidebarNavModeKey); } catch (_) {}
+              root.dataset.adminNavMode = storedDefaultNavMode === 'admin' ? 'admin' : 'public';
+            }
+          }
+
+          if (!isAdminPage) return;
+
+          if (isPageScopedAdminSidebar) {
+            root.dataset.adminSidebar = 'collapsed';
+            root.dataset.adminSidebarScope = 'page';
+          } else {
+            root.dataset.adminSidebar = 'expanded';
+            delete root.dataset.adminSidebarScope;
+          }
+
+          let storedShowTopNav = null;
+          try { storedShowTopNav = localStorage.getItem(showTopNavKey); } catch (_) {}
+          if (storedShowTopNav === 'true') {
+            root.dataset.adminShowTopNav = 'true';
+          } else {
+            delete root.dataset.adminShowTopNav;
+          }
+        })();
+      </script>
+    ) : null}
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" sizes="any" href={withBase('favicon.svg')} />
+    <link rel="icon" type="image/png" sizes="32x32" href={withBase('favicon-32x32.png')} />
+    <link rel="apple-touch-icon" sizes="180x180" href={withBase('apple-touch-icon.png')} />
+    <title>{fullTitle}</title>
+    {metaDescription && <meta name="description" content={metaDescription} />}
+    {canonical && <link rel="canonical" href={canonical} />}
+    <meta property="og:site_name" content={siteTitle} />
+    <meta property="og:title" content={fullTitle} />
+    {metaDescription && <meta property="og:description" content={metaDescription} />}
+    {canonical && <meta property="og:url" content={canonical} />}
+    <meta property="og:type" content={ogType} />
+    {ogImage && <meta property="og:image" content={ogImage} />}
+    <meta name="twitter:card" content={ogImage ? 'summary_large_image' : 'summary'} />
+    <meta name="twitter:title" content={fullTitle} />
+    {metaDescription && <meta name="twitter:description" content={metaDescription} />}
+    {ogImage && <meta name="twitter:image" content={ogImage} />}
+    {
+      deferGlobalStyles ? (
+        <>
+          <link rel="preload" href={globalStylesHref} as="style" />
+          <link
+            rel="stylesheet"
+            href={globalStylesHref}
+            media="print"
+            onload="this.onload=null;this.media='all'"
+          />
+          <noscript><link rel="stylesheet" href={globalStylesHref} /></noscript>
+        </>
+      ) : (
+        <link rel="stylesheet" href={globalStylesHref} />
+      )
+    }
+    {devUiPrefsStylesHref ? <link rel="stylesheet" href={devUiPrefsStylesHref} /> : null}
+    <slot name="head" />
+  </head>
+  <body
+    class={bodyClass}
+    data-code-line-numbers={showCodeLineNumbers ? undefined : 'off'}
+    data-dev-ui={isDev ? 'true' : undefined}
+    data-admin-dev={adminDevState}
+  >
+    <a class="skip-link" href="#content">跳到内容</a>
+    <div class="shell" data-sidebar-divider={sidebarDividerVariant}>
+      <Sidebar
+        siteTitle={brandTitle}
+        activeNavId={activeNavId}
+        isAdminContext={isAdminPage}
+        isDev={isDev}
+        allowReadingMode={allowReadingMode}
+        adminSidebarScope={isPageScopedAdminSidebar ? 'page' : 'default'}
+      />
+      <div class="divider" aria-hidden="true"></div>
+      <main id="content" class="content" tabindex="-1">
+        <div class="content__inner">
+          <slot />
+          <footer class="site-footer">© {yearRange} {footerCopyright}</footer>
+        </div>
+      </main>
+    </div>
+    <template id="scroll-top-template">
+      <button
+        type="button"
+        class="icon-button float-action scroll-top"
+        aria-label="回到顶部"
+        title="回到顶部"
+        aria-hidden="true"
+        tabindex="-1"
+      >
+        <UiIcon name="chevron-up" class="icon" />
+      </button>
+    </template>
+    <script>
+      import '../scripts/sidebar-theme.ts';
+      import '../scripts/sidebar-rail-nav.ts';
+      import '../scripts/sidebar-floating-actions.ts';
+      import '../scripts/sidebar-reading.ts';
+    </script>
+    {adminSidebarNavModeScriptHref ? (
+      <script is:inline type="module" src={adminSidebarNavModeScriptHref}></script>
+    ) : null}
+    {adminUiPrefsScriptHref ? (
+      <script is:inline type="module" src={adminUiPrefsScriptHref}></script>
+    ) : null}
+  </body>
+</html>

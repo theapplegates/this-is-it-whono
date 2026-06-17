@@ -1,0 +1,306 @@
+---
+import AdminLayout from '../../components/admin/AdminLayout.astro';
+import AdminIcon from '../../components/admin/AdminIcon.astro';
+import AdminShell from '../../components/admin/AdminShell.astro';
+import {
+  formatAdminOverviewWordMetric,
+  getAdminOverviewData,
+  type AdminOverviewData
+} from '../../lib/admin-console/overview';
+import { getThemeSettings } from '../../lib/theme-settings';
+import { createWithBase } from '../../utils/format';
+
+const isDev = import.meta.env.DEV;
+const base = import.meta.env.BASE_URL ?? '/';
+const withBase = createWithBase(base);
+const [{ default: adminShellStylesHref }, { default: adminOverviewStylesHref }] = await Promise.all([
+  import('../../styles/components/admin/shell.css?url'),
+  import('../../styles/components/admin/overview.css?url')
+]);
+const adminStylesHref = [adminShellStylesHref, adminOverviewStylesHref];
+const themeSettings = getThemeSettings().settings;
+const overviewMode = isDev
+  ? 'maintainer'
+  : themeSettings.site.adminOverview.publicVisible
+    ? 'public'
+    : 'hidden';
+const overviewHiddenMessage = themeSettings.site.adminOverview.hiddenMessage;
+const overview: AdminOverviewData | null = overviewMode === 'hidden'
+  ? null
+  : await getAdminOverviewData({
+      includeMaintainer: isDev,
+      includeDraftInRecent: isDev,
+      isDev
+    });
+const hasMaintainerDrafts = overviewMode === 'maintainer'
+  && overview?.maintainerSummary
+  && overview.maintainerSummary.draftCount > 0;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const getUtcDayStart = (date: Date) =>
+  Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+const getDaysSinceUpdate = (date: Date) =>
+  Math.max(0, Math.floor((getUtcDayStart(new Date()) - getUtcDayStart(date)) / MS_PER_DAY));
+const lastUpdateDays = overview?.stats.lastUpdate
+  ? String(getDaysSinceUpdate(overview.stats.lastUpdate.date))
+  : '暂无';
+const wordMetric = overview ? formatAdminOverviewWordMetric(overview.stats.wordCount) : null;
+const articleCount = overview?.collections.find((summary) => summary.key === 'essay')?.count ?? 0;
+const moreTagsHref = withBase('/archive/?picker=tag');
+const statItems = overview && wordMetric
+  ? [
+      {
+        label: '文章数量',
+        value: String(articleCount),
+        suffix: '篇'
+      },
+      {
+        label: '标签数量',
+        value: String(overview.stats.tagCount),
+        suffix: '个'
+      },
+      {
+        label: '文字统计',
+        value: wordMetric.value,
+        suffix: wordMetric.suffix
+      },
+      {
+        label: '距上次更新',
+        value: lastUpdateDays,
+        suffix: overview.stats.lastUpdate ? '天' : ''
+      }
+    ]
+  : [];
+---
+
+<AdminLayout title="Site Overview" stylesHref={adminStylesHref}>
+  <AdminShell
+    currentRoute="overview"
+    title="Site Overview"
+    subtitle="站点概览"
+    showNav={isDev && overviewMode !== 'hidden'}
+  >
+    {overview ? (
+    <section class="admin-site-overview" aria-labelledby="admin-site-overview-title" data-admin-overview-mode={overviewMode}>
+      <h2 id="admin-site-overview-title" class="sr-only">站点概览</h2>
+
+      <div class="admin-site-overview__stats" aria-label="站点统计">
+        {
+          statItems.map((item) => (
+            <div class="admin-site-overview__stat">
+              <p class="admin-site-overview__label">{item.label}</p>
+              <p class="admin-site-overview__stat-value">
+                <span>{item.value}</span>
+                {item.suffix ? <small>{item.suffix}</small> : null}
+              </p>
+            </div>
+          ))
+        }
+      </div>
+
+      <div class="admin-site-overview__middle">
+        <section class="admin-site-overview__section" aria-labelledby="admin-overview-structure">
+          <div class="admin-site-overview__section-head">
+            <h3 id="admin-overview-structure">
+              <AdminIcon name="layers" class="admin-site-overview__icon" size={14} />
+              内容结构
+            </h3>
+          </div>
+          <div class="admin-site-overview__structure-list">
+            {
+              overview.collections.map((summary) => (
+                <div class="admin-site-overview__structure-row">
+                  <div class="admin-site-overview__structure-copy">
+                    <span>{summary.label}</span>
+                    <small>({summary.detail})</small>
+                  </div>
+                  <div
+                    class="admin-site-overview__structure-bar"
+                    style={`--share: ${summary.percentage}%;`}
+                    aria-hidden="true"
+                  >
+                    <span></span>
+                  </div>
+                  <span class="admin-site-overview__structure-count">
+                    {summary.count} / {summary.percentageLabel}
+                  </span>
+                </div>
+              ))
+            }
+          </div>
+        </section>
+
+        <div class="admin-site-overview__side">
+          <section class="admin-site-overview__section" aria-labelledby="admin-overview-tags">
+            <div class="admin-site-overview__section-head">
+              <h3 id="admin-overview-tags">
+                <AdminIcon name="tags" class="admin-site-overview__icon" size={14} />
+                热门标签
+              </h3>
+            </div>
+            {
+              overview.topTags.length > 0 ? (
+                <div class="admin-site-overview__tag-list">
+                  {
+                    overview.topTags.map((tag) => (
+                      <a class="admin-site-overview__tag" href={withBase(tag.href)} title={`#${tag.label}`}>
+                        <span class="admin-site-overview__tag-name">
+                          <span class="admin-site-overview__tag-hash">#</span>{tag.label}
+                        </span>
+                        <span class="admin-site-overview__tag-count">{tag.count}</span>
+                      </a>
+                    ))
+                  }
+                  {
+                    overview.stats.tagCount > overview.topTags.length ? (
+                      <a
+                        class="admin-site-overview__tag"
+                        href={moreTagsHref}
+                        title="查看所有标签"
+                        aria-label={`查看全部 ${overview.stats.tagCount} 个标签`}
+                      >
+                        <span class="admin-site-overview__tag-name">更多</span>
+                      </a>
+                    ) : null
+                  }
+                </div>
+              ) : (
+                <p class="admin-site-overview__empty">暂无归档标签。</p>
+              )
+            }
+          </section>
+        </div>
+      </div>
+
+      <section
+        class="admin-site-overview__section admin-site-overview__section--recent"
+        aria-labelledby="admin-overview-recent"
+      >
+        <div class="admin-site-overview__section-head admin-site-overview__section-head--split">
+          <h3 id="admin-overview-recent">
+            <AdminIcon name="list" class="admin-site-overview__icon" size={14} />
+            近期发布
+          </h3>
+          {hasMaintainerDrafts ? (
+            <span class="admin-site-overview__recent-draft-note">草稿仅 DEV 可见</span>
+          ) : null}
+        </div>
+        {
+          overview.recentPublications.length > 0 ? (
+            <ol class="admin-site-overview__recent-list">
+              {
+                overview.recentPublications.map((entry) => {
+                  const Element = entry.href ? 'a' : 'div';
+                  const props = entry.href ? { href: withBase(entry.href) } : {};
+                  return (
+                    <li>
+                      <Element class="admin-site-overview__recent-row" {...props}>
+                        <span class="admin-site-overview__recent-meta">
+                          <time datetime={entry.date ? entry.date.toISOString() : undefined}>
+                            {entry.shortDateLabel}
+                          </time>
+                          <span class="admin-site-overview__recent-type">{entry.collectionLabel}</span>
+                        </span>
+                        <span class="admin-site-overview__recent-title">{entry.title}</span>
+                        {entry.isDraft ? <span class="admin-site-overview__recent-badge">[draft]</span> : null}
+                      </Element>
+                    </li>
+                  );
+                })
+              }
+            </ol>
+          ) : (
+            <p class="admin-site-overview__empty">暂无近期内容。</p>
+          )
+        }
+      </section>
+
+      <section class="admin-site-overview__section" aria-labelledby="admin-overview-activity">
+        <div class="admin-site-overview__section-head admin-site-overview__section-head--split">
+          <h3 id="admin-overview-activity">
+            <AdminIcon name="activity" class="admin-site-overview__icon" size={14} />
+            写作活动
+          </h3>
+          <span class="admin-site-overview__activity-range">最近 90 天</span>
+        </div>
+        {
+          overview.writingActivity.length > 0 ? (
+            <div class="admin-site-overview__activity-grid" role="img" aria-label="最近 90 天写作活动">
+              {
+                overview.writingActivity.map((day) => (
+                  <span
+                    class={`admin-site-overview__activity-dot is-level-${day.level}`}
+                    title={`${day.dateLabel}: ${day.count} 项`}
+                    aria-hidden="true"
+                  ></span>
+                ))
+              }
+            </div>
+          ) : (
+            <p class="admin-site-overview__empty">暂无可用于活动统计的公开随笔或絮语。</p>
+          )
+        }
+      </section>
+
+      <section class="admin-site-overview__system" aria-labelledby="admin-overview-system">
+        <div class="admin-site-overview__system-head">
+          <h3 id="admin-overview-system">
+            <AdminIcon name="terminal" class="admin-site-overview__icon" size={14} />
+            运行信息
+          </h3>
+          <span class="admin-site-overview__system-state">
+            <span aria-hidden="true"></span>
+            {overview.systemStatus.statusLabel}
+          </span>
+        </div>
+        <div class="admin-site-overview__system-body">
+          <dl class="admin-site-overview__system-grid">
+            {
+              overview.systemStatus.items.map((item) => (
+                <div class="admin-site-overview__system-item">
+                  <dt>{item.label}</dt>
+                  <dd>
+                    {
+                      item.dateTime ? (
+                        <time datetime={item.dateTime}>{item.value}</time>
+                      ) : (
+                        item.value
+                      )
+                    }
+                  </dd>
+                </div>
+              ))
+            }
+          </dl>
+          {
+            overview.systemStatus.activity.length > 0 ? (
+              <div class="admin-site-overview__system-pulse" role="group" aria-label="最近 14 天内容活动">
+                <span class="admin-site-overview__system-pulse-caption">Content Activity</span>
+                <div class="admin-site-overview__system-pulse-bars">
+                  {
+                    overview.systemStatus.activity.map((day) => (
+                      <span
+                        class={`admin-site-overview__system-pulse-bar is-level-${day.level}`}
+                        title={`${day.dateLabel}: ${day.count} 项`}
+                        aria-hidden="true"
+                      ></span>
+                    ))
+                  }
+                </div>
+              </div>
+            ) : null
+          }
+        </div>
+      </section>
+    </section>
+    ) : (
+      <section
+        class="admin-site-overview admin-site-overview--hidden"
+        aria-labelledby="admin-site-overview-title"
+        data-admin-overview-mode={overviewMode}
+      >
+        <h2 id="admin-site-overview-title" class="sr-only">站点概览</h2>
+        <p class="admin-site-overview__hidden-message">{overviewHiddenMessage}</p>
+      </section>
+    )}
+  </AdminShell>
+</AdminLayout>

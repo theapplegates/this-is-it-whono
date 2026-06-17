@@ -1,0 +1,63 @@
+---
+import { getEntry, render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import BrandIcon from '../../components/BrandIcon.astro';
+import '../../styles/about.css';
+import { getThemeSettings } from '../../lib/theme-settings';
+import { replaceAboutContactLinksPlaceholderHtml } from '../../lib/about-contact-links';
+
+const entry = await getEntry('about', 'index');
+if (!entry) {
+  throw new Error('Missing about page entry: src/content/about/index.md');
+}
+
+const { settings } = getThemeSettings();
+const resolvedSocialItems = settings.site.socialLinks.resolvedSocialItems.filter((item) => item.visible);
+const aboutTitle = settings.page.about.title || '关于';
+const aboutSubtitle = settings.page.about.subtitle;
+const entryWithContactLinks = entry.rendered
+  ? {
+      ...entry,
+      rendered: {
+        ...entry.rendered,
+        html: replaceAboutContactLinksPlaceholderHtml(entry.rendered.html, resolvedSocialItems)
+      }
+    }
+  : entry;
+const { Content } = await render(entryWithContactLinks);
+---
+
+<BaseLayout
+  title={aboutTitle}
+  description={aboutSubtitle ?? undefined}
+  bodyClass="about-page"
+>
+  <div class="page-header page-header--about">
+    <div class="page-heading">
+      <h1 class="page-title">{aboutTitle}</h1>
+      {aboutSubtitle ? <span class="page-subtitle">{aboutSubtitle}</span> : null}
+    </div>
+    {
+      resolvedSocialItems.length ? (
+        <div class="page-actions">
+          {resolvedSocialItems.map((item) => (
+            <a class="icon-link" href={item.href} aria-label={item.label} title={item.label}>
+              <BrandIcon name={item.iconKey} class="icon" />
+            </a>
+          ))}
+        </div>
+      ) : null
+    }
+  </div>
+
+  <div class="about-body prose">
+    <Content />
+  </div>
+
+  <script>
+    import { initAboutSiteInfoCopyButtons, initCodeCopyButtons } from '../../scripts/lightbox';
+
+    initCodeCopyButtons();
+    initAboutSiteInfoCopyButtons();
+  </script>
+</BaseLayout>
