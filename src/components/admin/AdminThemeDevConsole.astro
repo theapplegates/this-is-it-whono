@@ -1,0 +1,95 @@
+---
+import type { SidebarNavId } from '../../lib/theme-settings';
+import AdminDiagnosticPanel from './AdminDiagnosticPanel.astro';
+import AdminHomeSection from './AdminHomeSection.astro';
+import AdminPageSection from './AdminPageSection.astro';
+import AdminSidebarSection from './AdminSidebarSection.astro';
+import AdminSiteSection from './AdminSiteSection.astro';
+import AdminUiSection from './AdminUiSection.astro';
+
+interface Props {
+  bootstrapText: string;
+  footerStartYearMin: number;
+  footerStartYearMax: number;
+  homeIntroMaxLength: number;
+  memoSubtitlePlaceholder: string;
+  memoTitlePlaceholder: string;
+  navIdOrder: readonly SidebarNavId[];
+  pageSubtitleMaxLength: number;
+  pageTitleMaxLength: number;
+  settingsEndpoint: string;
+  socialCustomLimit: number;
+}
+
+const {
+  bootstrapText,
+  footerStartYearMin,
+  footerStartYearMax,
+  homeIntroMaxLength,
+  memoSubtitlePlaceholder,
+  memoTitlePlaceholder,
+  navIdOrder,
+  pageSubtitleMaxLength,
+  pageTitleMaxLength,
+  settingsEndpoint,
+  socialCustomLimit
+} = Astro.props;
+---
+
+<section class="admin-theme-console" data-admin-root data-settings-endpoint={settingsEndpoint}>
+  <AdminDiagnosticPanel
+    bannerId="admin-error-banner"
+    titleId="admin-error-title"
+    messageId="admin-error-message"
+    listId="admin-error-list"
+    title="操作未完成"
+    label="配置异常"
+    retryAction={{
+      id: 'admin-error-retry',
+      label: '重新检测'
+    }}
+    tabindex={-1}
+  />
+
+  <form id="admin-form" class="admin-form" novalidate>
+    <AdminSiteSection
+      footerStartYearMin={footerStartYearMin}
+      footerStartYearMax={footerStartYearMax}
+      socialCustomLimit={socialCustomLimit}
+    />
+
+    <AdminSidebarSection navIdOrder={navIdOrder} />
+
+    <AdminHomeSection homeIntroMaxLength={homeIntroMaxLength} />
+
+    <AdminPageSection
+      pageTitleMaxLength={pageTitleMaxLength}
+      pageSubtitleMaxLength={pageSubtitleMaxLength}
+      memoTitlePlaceholder={memoTitlePlaceholder}
+      memoSubtitlePlaceholder={memoSubtitlePlaceholder}
+    />
+
+    <AdminUiSection />
+  </form>
+
+  <div id="admin-actions-sentinel" class="admin-actions__sentinel" aria-hidden="true"></div>
+  <div id="admin-actions" class="admin-actions" data-dirty="false" data-sticky="false">
+    <div class="admin-actions__meta">
+      <p id="admin-dirty-banner" class="admin-banner admin-banner--dirty" hidden>
+        * 你有未保存更改。
+      </p>
+    </div>
+    <div class="admin-actions__controls">
+      <p id="admin-status-inline" class="admin-status admin-status--inline" data-state="idle" aria-hidden="true">
+        等待加载
+      </p>
+      <div class="admin-actions__buttons">
+        <button id="admin-validate" class="admin-btn admin-btn--secondary admin-btn--compact" type="button">检查配置</button>
+        <button id="admin-reset" class="admin-btn admin-btn--ghost admin-btn--compact" type="button">重置更改</button>
+        <button id="admin-save" class="admin-btn admin-btn--primary admin-btn--compact" type="button">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="admin-bootstrap" hidden>{bootstrapText}</div>
+</section>

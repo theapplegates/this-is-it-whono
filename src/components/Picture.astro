@@ -1,0 +1,147 @@
+---
+import type { HTMLAttributes } from "astro/types";
+import {
+  getCldImageUrl,
+  type GetCldImageUrlOptions,
+} from "astro-cloudinary/helpers";
+
+type CloudinaryFormat = "jxl" | "avif" | "webp";
+type CloudinaryBreakpoint = number | { width: number };
+type CloudinaryBreakpointSet =
+  | CloudinaryBreakpoint[]
+  | { breakpoints: CloudinaryBreakpoint[] };
+type ImageAttrs = Omit<
+  HTMLAttributes<"img">,
+  "src" | "srcset" | "alt" | "width" | "height" | "sizes"
+>;
+type Transformations = Omit<
+  GetCldImageUrlOptions,
+  "src" | "width" | "height" | "format"
+>;
+
+type Props = {
+  src: string;
+  alt: string;
+  width: number | string;
+  height: number | string;
+  sizes: string;
+  // In .md posts (no MDX) this arrives as a string; in .mdx it can be an array.
+  breakpoints: CloudinaryBreakpointSet | string;
+  pictureClass?: string;
+  transformations?: Transformations;
+} & ImageAttrs;
+
+const FORMAT_ORDER: CloudinaryFormat[] = ["jxl", "avif", "webp"];
+const MIME_TYPES: Record<CloudinaryFormat, string> = {
+  jxl: "image/jxl",
+  avif: "image/avif",
+  webp: "image/webp",
+};
+
+const {
+  src,
+  alt,
+  width,
+  height,
+  sizes,
+  breakpoints,
+  pictureClass,
+  transformations = {},
+  loading = "lazy",
+  decoding = "async",
+  ...attrs
+} = Astro.props;
+
+if (!alt) {
+  throw new Error(`Cloudinary <Picture> requires an alt for src: "${src}".`);
+}
+
+const intrinsicWidth = Number(width);
+const intrinsicHeight = Number(height);
+
+// Accept an array, a { breakpoints: [...] } wrapper, a JSON array string
+// ("[200, 382]"), or a comma-separated string of widths ("200, 382, 527").
+function toBreakpointList(
+  input: CloudinaryBreakpointSet | string | undefined
+): CloudinaryBreakpoint[] | undefined {
+  if (input === undefined || input === null || input === "") return undefined;
+  if (typeof input === "string") {
+    const trimmed = input.trim();
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        const parsed: unknown = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) return parsed as CloudinaryBreakpoint[];
+      } catch {
+        /* fall through to comma split */
+      }
+    }
+    return trimmed
+      .split(",")
+      .map((value) => Number(value.trim()))
+      .filter((value) => Number.isFinite(value));
+  }
+  return Array.isArray(input) ? input : input.breakpoints;
+}
+
+const breakpointList = toBreakpointList(breakpoints);
+
+if (!breakpointList || breakpointList.length === 0) {
+  throw new Error(
+    `Cloudinary breakpoints are missing or empty for src: "${src}". Run "npm run cloudinary:breakpoints -- src/assets/images/<file>" and pass the generated widths.`
+  );
+}
+
+const getBreakpointWidth = (breakpoint: CloudinaryBreakpoint) =>
+  typeof breakpoint === "number" ? breakpoint : breakpoint.width;
+
+const normalizedBreakpoints = [
+  ...new Set(
+    breakpointList
+      .map(getBreakpointWidth)
+      .filter((breakpoint) => Number.isFinite(breakpoint) && breakpoint > 0)
+      .concat(intrinsicWidth)
+      .filter((breakpoint) => Number.isFinite(breakpoint) && breakpoint > 0)
+  ),
+].sort((a, b) => a - b);
+
+if (normalizedBreakpoints.length === 0) {
+  throw new Error(
+    `Cloudinary breakpoints are required for "${src}". Run "npm run cloudinary:breakpoints -- src/assets/images/<file>" and pass the generated widths.`
+  );
+}
+
+const createUrl = (format: CloudinaryFormat, breakpointWidth: number) =>
+  getCldImageUrl({
+    crop: "limit",
+    quality: "auto",
+    ...transformations,
+    src,
+    width: breakpointWidth,
+    format,
+  });
+
+const createSrcSet = (format: CloudinaryFormat) =>
+  normalizedBreakpoints
+    .map((breakpointWidth) => `${createUrl(format, breakpointWidth)} ${breakpointWidth}w`)
+    .join(", ");
+
+const fallbackSrc = createUrl("webp", intrinsicWidth);
+---
+
+<picture class={pictureClass}>
+  {
+    FORMAT_ORDER.map((format) => (
+      <source type={MIME_TYPES[format]} sizes={sizes} srcset={createSrcSet(format)} />
+    ))
+  }
+  <img
+    {...attrs}
+    src={fallbackSrc}
+    alt={alt}
+    width={intrinsicWidth}
+    height={intrinsicHeight}
+    sizes={sizes}
+    loading={loading}
+    decoding={decoding}
+  />
+</picture>

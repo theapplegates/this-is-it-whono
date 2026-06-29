@@ -1,0 +1,19 @@
+---
+import AdminIcon from './AdminIcon.astro';
+---
+
+<fieldset class="admin-group">
+  <legend class="admin-group__legend">
+    <AdminIcon name="admin-code" class="admin-group__legend-icon" size={14} />
+    <span class="admin-group__legend-copy">
+      <span class="admin-group__legend-zh">代码显示</span>
+      <span class="admin-group__legend-en">Code</span>
+    </span>
+  </legend>
+  <div class="admin-stack">
+    <label class="admin-toggle-row">
+      <input id="ui-code-line-numbers" type="checkbox" />
+      <span>在代码块中显示行号</span>
+    </label>
+  </div>
+</fieldset>

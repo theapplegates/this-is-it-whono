@@ -1,0 +1,160 @@
+---
+import { type BitsEntry, getBitAnchorId } from '../lib/bits';
+import { buildBitsCardViewModel } from '../lib/bits-card-view-model';
+import { getThemeSettings } from '../lib/theme-settings';
+
+const {
+  bit,
+  excerpt = '',
+  Content = null,
+  prioritizeLeadMedia = false
+} = Astro.props;
+
+const bitEntry = bit as BitsEntry;
+const base = import.meta.env.BASE_URL ?? '/';
+const { settings } = getThemeSettings();
+const card = buildBitsCardViewModel({
+  id: bitEntry.id,
+  slug: bitEntry.data.slug,
+  bodyText: bitEntry.body ?? '',
+  tags: bitEntry.data.tags ?? [],
+  date: bitEntry.data.date,
+  images: bitEntry.data.images ?? [],
+  ...(bitEntry.data.author ? { author: bitEntry.data.author } : {}),
+  defaultAuthor: settings.page.bits.defaultAuthor,
+  base
+});
+const previewExcerpt = excerpt || (!Content ? card.body.excerpt : '');
+const maxVisible = 4;
+const getImageLoading = (prioritize: boolean) => (prioritize ? 'eager' : 'lazy');
+const getImageFetchPriority = (prioritize: boolean) => (prioritize ? 'high' : undefined);
+---
+
+<article
+  class="bit-card"
+  id={getBitAnchorId(bitEntry.id)}
+  data-bit
+  data-bit-key={bitEntry.id}
+  data-slug={card.slug}
+>
+  <div class="bit-author">
+    <div class={`avatar${card.authorAvatar ? ' avatar--image' : ' is-fallback'}`} aria-hidden="true">
+      {card.authorAvatar ? (
+        <img
+          src={card.authorAvatar}
+          alt=""
+          width="32"
+          height="32"
+          loading="lazy"
+          decoding="async"
+          onerror="this.parentElement?.classList.add('is-fallback'); this.remove();"
+        />
+      ) : null}
+      <span class="avatar-fallback">{card.avatarLetter}</span>
+    </div>
+    <div class="name">{card.authorName}</div>
+  </div>
+
+  {Content ? (
+    <div class="bit-body">
+      <Content />
+    </div>
+  ) : previewExcerpt ? (
+    <div class="bit-body">
+      <p>{previewExcerpt}</p>
+    </div>
+  ) : null}
+
+  {card.firstImage ? (
+    <div class="bit-media bit-media--single">
+      <button
+        type="button"
+        class="bit-media-item bit-media-item--single"
+        data-bit-image-button
+        data-bit-image-index="0"
+        aria-label="查看图片预览"
+      >
+        <img
+          src={card.firstImage.src}
+          alt={card.firstImage.alt}
+          width={card.firstImage.width}
+          height={card.firstImage.height}
+          loading={getImageLoading(prioritizeLeadMedia)}
+          fetchpriority={getImageFetchPriority(prioritizeLeadMedia)}
+        />
+      </button>
+    </div>
+  ) : card.imageItems.length > 1 ? (
+    <div class="bit-media bit-media--grid">
+      <div class="bit-media-grid">
+        {card.visibleImages.map((image, index) => {
+          const isMore = index === maxVisible - 1 && card.imageItems.length > maxVisible;
+          return (
+            <button
+              type="button"
+              class={`bit-media-item${index === card.wideIndex ? ' bit-media-item--wide' : ''}${isMore ? ' bit-media-item--more' : ''}`}
+              data-bit-image-button
+              data-bit-image-index={index}
+              aria-label={isMore ? `查看全部图片（共 ${card.imageItems.length} 张）` : `图片 ${index + 1}`}
+            >
+              <img
+                src={image.src}
+                alt={image.alt}
+                width={image.width}
+                height={image.height}
+                loading={getImageLoading(prioritizeLeadMedia && index === 0)}
+                fetchpriority={getImageFetchPriority(prioritizeLeadMedia && index === 0)}
+              />
+              {isMore ? (
+                <>
+                  <span class="bit-media-more" aria-hidden="true" data-bit-image-open-hidden={maxVisible}>
+                    <span class="bit-media-more-short">+ {card.imageItems.length - maxVisible}</span>
+                    <span class="bit-media-more-full">查看其余{card.imageItems.length - maxVisible}张</span>
+                  </span>
+                </>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  ) : null}
+
+  {card.imageItems.length ? (
+    <div hidden aria-hidden="true">
+      {card.imageItems.map((image) => (
+        <span
+          data-bit-image-item
+          data-bit-image-src={image.src}
+          data-bit-image-alt={image.alt}
+          data-bit-image-width={image.width}
+          data-bit-image-height={image.height}
+        ></span>
+      ))}
+    </div>
+  ) : null}
+
+  <div class="bit-meta">
+    {card.hasTags ? (
+      <div class="bit-tags">
+        {card.placeText ? (
+          <span class="bit-tag bit-tag--place">
+            <span class="bit-tag-icon" aria-hidden="true">📍</span>
+            <span class="bit-tag-text">{card.placeText}</span>
+          </span>
+        ) : null}
+        {card.normalTagItems.length ? (
+          <span class="bit-tag bit-tag--normal">
+            <span class="bit-tag-icon" aria-hidden="true">❤</span>
+            <span class="bit-tag-list">
+              {card.normalTagItems.map((tag) => (
+                <span class="bit-tag-token">{tag}</span>
+              ))}
+            </span>
+          </span>
+        ) : null}
+      </div>
+    ) : null}
+    <div>{card.dateLabel}</div>
+  </div>
+</article>

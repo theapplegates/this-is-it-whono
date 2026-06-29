@@ -1,0 +1,298 @@
+---
+import AdminDiagnosticPanel from '../../../components/admin/AdminDiagnosticPanel.astro';
+import AdminIcon from '../../../components/admin/AdminIcon.astro';
+import AdminLayout from '../../../components/admin/AdminLayout.astro';
+import AdminReadonlyNotice from '../../../components/admin/AdminReadonlyNotice.astro';
+import AdminShell from '../../../components/admin/AdminShell.astro';
+import { getEditableThemeSettingsState } from '../../../lib/theme-settings';
+import {
+  ADMIN_SETTINGS_EXPORT_SCHEMA_VERSION,
+  ADMIN_SETTINGS_EXPORT_SCOPE
+} from '../../../lib/admin-console/settings-data';
+import {
+  ADMIN_DATA_SETTINGS_API_PATH,
+  ADMIN_SETTINGS_API_PATH
+} from '../../../lib/admin-console/admin-api-paths';
+import { createWithBase } from '../../../utils/format';
+
+const isDev = import.meta.env.DEV;
+const base = import.meta.env.BASE_URL ?? '/';
+const withBase = createWithBase(base);
+const exportIncludedScopesLabel = `['${ADMIN_SETTINGS_EXPORT_SCOPE}']`;
+const { default: adminShellStylesHref } = await import('../../../styles/components/admin/shell.css?url');
+
+const loadDataDevState = async () => {
+  const [
+    { default: adminDataScriptHref },
+    { default: adminDataStylesHref }
+  ] = await Promise.all([
+    import('../../../scripts/admin-data/index.ts?url'),
+    import('../../../styles/components/admin/data.css?url')
+  ]);
+
+  return {
+    adminDataScriptHref,
+    stylesHref: [adminShellStylesHref, adminDataStylesHref],
+    editableState: getEditableThemeSettingsState()
+  };
+};
+
+const dataDevState = isDev ? await loadDataDevState() : null;
+const editableState = dataDevState?.editableState;
+const bootstrapText =
+  editableState && editableState.ok
+    ? JSON.stringify({
+        revision: editableState.payload.revision,
+        exportEndpoint: withBase(ADMIN_DATA_SETTINGS_API_PATH),
+        importEndpoint: withBase(ADMIN_SETTINGS_API_PATH)
+      })
+    : null;
+---
+
+<AdminLayout title="Data Console" stylesHref={dataDevState?.stylesHref ?? adminShellStylesHref}>
+  <AdminShell
+    currentRoute="data"
+    title="Data Console"
+    subtitle="配置快照"
+    showNav={isDev}
+  >
+    {isDev ? (
+      <div slot="status" class="admin-status-slot">
+        <p id="admin-data-status-live" class="admin-sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
+        <p id="admin-data-status" class="admin-status" data-state="idle">等待操作</p>
+      </div>
+    ) : null}
+
+    {
+      isDev && dataDevState && editableState?.ok && bootstrapText ? (
+        <section class="admin-data-console" data-admin-data-root>
+          <AdminDiagnosticPanel
+            bannerId="admin-data-error-banner"
+            titleId="admin-data-error-title"
+            messageId="admin-data-error-message"
+            listId="admin-data-error-list"
+            title="导入导出未完成"
+            label="导入异常"
+            tabindex={-1}
+          />
+
+          <div class="admin-data-console__grid">
+            <article class="admin-data-panel admin-data-panel--export">
+              <div class="admin-data-panel__copy">
+                <h2 class="admin-data-panel__title">导出当前配置快照</h2>
+                <p class="admin-data-panel__body">
+                  导出当前 settings 快照
+                </p>
+                <p class="admin-data-panel__body admin-data-panel__body--subtle">
+                  用于迁移前比对或回滚前留档。
+                </p>
+                <div class="admin-data-panel__actions">
+                  <button
+                    id="admin-data-export"
+                    class="admin-btn admin-btn--secondary admin-data-btn"
+                    type="button"
+                  >
+                    <AdminIcon name="download" size={18} />
+                    <span>导出 JSON 快照</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="admin-data-panel__side admin-data-manifest-card">
+                <dl class="admin-data-manifest" aria-label="导出 manifest 摘要">
+                  <div class="admin-data-manifest__row">
+                    <dt class="admin-data-manifest__label">schemaVersion</dt>
+                    <dd class="admin-data-manifest__value">v{ADMIN_SETTINGS_EXPORT_SCHEMA_VERSION}</dd>
+                  </div>
+                  <div class="admin-data-manifest__row">
+                    <dt class="admin-data-manifest__label">includedScopes</dt>
+                    <dd class="admin-data-manifest__value">{exportIncludedScopesLabel}</dd>
+                  </div>
+                  <div class="admin-data-manifest__row">
+                    <dt class="admin-data-manifest__label">locale</dt>
+                    <dd class="admin-data-manifest__value">{editableState.payload.settings.site.defaultLocale}</dd>
+                  </div>
+                </dl>
+              </div>
+            </article>
+
+            <article class="admin-data-panel admin-data-panel--import">
+              <div class="admin-data-panel__drop">
+                <input
+                  id="admin-data-file"
+                  class="admin-data-file-input"
+                  type="file"
+                  accept=".json,application/json"
+                  tabindex="-1"
+                  aria-hidden="true"
+                />
+                <div
+                  id="admin-data-dropzone"
+                  class="admin-data-dropzone"
+                  data-has-file="false"
+                  data-disabled="false"
+                  role="group"
+                  aria-label="JSON 快照导入文件选择区"
+                  aria-disabled="false"
+                >
+                  <button
+                    id="admin-data-dropzone-empty"
+                    class="admin-data-dropzone__empty"
+                    type="button"
+                    aria-describedby="admin-data-dropzone-note"
+                  >
+                    <span class="admin-data-dropzone__icon" aria-hidden="true">
+                      <AdminIcon name="upload" size={21} strokeWidth={1.8} />
+                    </span>
+                    <span class="admin-data-dropzone__title">点击或拖拽 JSON 快照至此区域</span>
+                    <span id="admin-data-dropzone-note" class="admin-data-dropzone__note">
+                      校验通过后可执行 dry-run
+                    </span>
+                  </button>
+
+                  <section
+                    id="admin-data-dropzone-summary"
+                    class="admin-data-dropzone__summary"
+                    aria-labelledby="admin-data-dropzone-summary-title"
+                    hidden
+                  >
+                    <div class="admin-data-dropzone__summary-topline">
+                      <h3 id="admin-data-dropzone-summary-title" class="admin-data-dropzone__summary-heading">
+                        JSON 快照摘要
+                      </h3>
+                      <button
+                        id="admin-data-dropzone-reselect"
+                        class="admin-data-dropzone__summary-action"
+                        type="button"
+                        aria-label="重新选择 JSON 快照"
+                      >
+                        重新选择
+                      </button>
+                    </div>
+                    <div class="admin-data-dropzone__summary-file-row">
+                      <span class="admin-data-dropzone__summary-field-label">文件名称</span>
+                      <code
+                        id="admin-data-selected-file"
+                        class="admin-data-dropzone__summary-field-value admin-data-dropzone__summary-field-value--file"
+                        hidden
+                      ></code>
+                    </div>
+                    <dl id="admin-data-dropzone-meta" class="admin-data-dropzone__summary-meta" hidden></dl>
+                  </section>
+                </div>
+              </div>
+
+              <div class="admin-data-panel__copy admin-data-panel__copy--import">
+                <h2 class="admin-data-panel__title">导入 settings 快照</h2>
+                <p class="admin-data-panel__body">
+                  选择或拖拽导出的 JSON 快照。
+                </p>
+                <p class="admin-data-panel__body admin-data-panel__body--subtle">
+                  先解析校验，执行 dry-run，确认后写入。
+                </p>
+              </div>
+
+              <div class="admin-data-panel__actions admin-data-panel__actions--stack admin-data-panel__actions--import">
+                <button
+                  id="admin-data-dry-run"
+                  class="admin-btn admin-btn--secondary admin-data-btn"
+                  type="button"
+                  data-step-state="blocked"
+                  disabled
+                >
+                  1. Dry-run 模拟写入
+                </button>
+                <button
+                  id="admin-data-apply"
+                  class="admin-btn admin-btn--primary admin-data-btn"
+                  type="button"
+                  data-step-state="blocked"
+                  disabled
+                >
+                  2. 确认替换配置文件
+                </button>
+              </div>
+            </article>
+
+            <article id="admin-data-preview" class="admin-data-terminal" data-preview-state="idle">
+              <div class="admin-data-terminal__header">
+                <p class="admin-data-terminal__title">
+                  <span aria-hidden="true">&gt;_</span>
+                  <span>变更预览 (Dry-Run Diff / Log)</span>
+                </p>
+                <span
+                  id="admin-data-preview-badge"
+                  class="admin-data-terminal__badge"
+                  data-state="idle"
+                >
+                  AWAITING_INPUT
+                </span>
+              </div>
+
+              <div class="admin-data-terminal__body">
+                <div id="admin-data-preview-empty" class="admin-data-terminal__empty">
+                  <div class="admin-data-terminal__empty-heading">
+                    <span class="admin-data-terminal__empty-icon" aria-hidden="true">
+                      <AdminIcon name="monitor" size={30} strokeWidth={1.55} />
+                    </span>
+                    <p id="admin-data-preview-empty-title" class="admin-data-terminal__empty-title">
+                      等待导入快照
+                    </p>
+                  </div>
+                  <p id="admin-data-preview-empty-body" class="admin-data-terminal__empty-body">
+                    选择 JSON 快照并执行 dry-run 后，此处显示预览结果
+                  </p>
+                </div>
+
+                <div id="admin-data-preview-content" class="admin-data-terminal__content" hidden>
+                  <h2 id="admin-data-preview-title" class="admin-data-terminal__section-title">变更预览</h2>
+                  <div class="admin-data-terminal__section-copy">
+                    <div class="admin-data-terminal__section-summary">
+                      <span class="admin-data-terminal__section-icon" aria-hidden="true">
+                        <AdminIcon name="scan" size={18} />
+                      </span>
+                      <p id="admin-data-preview-body" class="admin-data-terminal__section-body">
+                        dry-run 完成后，会在这里展示将变更的 settings 分组。
+                      </p>
+                    </div>
+                    <p
+                      id="admin-data-preview-note"
+                      class="admin-data-terminal__section-note"
+                      hidden
+                    ></p>
+                  </div>
+                  <ul id="admin-data-result-list" class="admin-data-terminal__list"></ul>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div id="admin-data-bootstrap" hidden>{bootstrapText}</div>
+        </section>
+      ) : isDev && editableState && !editableState.ok ? (
+        <section class="admin-overview">
+          <article class="admin-overview-card">
+            <p class="admin-overview-card__eyebrow">Invalid Settings</p>
+            <h2 class="admin-overview-card__title">settings JSON 当前不可写</h2>
+            <p class="admin-overview-card__body">
+              Data Console 复用 Theme Console 现有 invalid-settings guard。当前 `src/data/settings/*.json` 存在结构问题，导出与导入已暂停，需先修复对应文件。
+            </p>
+            <ul class="admin-overview-card__list">
+              {editableState.errors.map((error) => <li>{error}</li>)}
+            </ul>
+          </article>
+        </section>
+      ) : (
+        <AdminReadonlyNotice>
+          若需导入或导出 settings 快照，请在本地运行 <code translate="no">npm run dev</code> 后从此入口进入。
+        </AdminReadonlyNotice>
+      )
+    }
+  </AdminShell>
+
+  {
+    isDev && dataDevState?.adminDataScriptHref && bootstrapText ? (
+      <script is:inline type="module" src={dataDevState.adminDataScriptHref}></script>
+    ) : null
+  }
+</AdminLayout>
