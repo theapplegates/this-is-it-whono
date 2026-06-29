@@ -1,0 +1,86 @@
+{
+  "asset_id": "bcc1c11a844b6ea22c416ee76ad7d57c",
+  "public_id": "s9tgwsn6jycdd9scqiph",
+  "version": 1779480767,
+  "width": 3424,
+  "height": 5109,
+  "format": "jpg",
+  "secure_url": "https://res.cloudinary.com/paulapplegate-com/image/upload/v1779480767/s9tgwsn6jycdd9scqiph.jpg",
+  "raw_widths_from_cloudinary": [
+    200,
+    1005,
+    1389,
+    1400
+  ],
+  "selected_widths": [
+    200,
+    1005,
+    1389,
+    1400
+  ],
+  "widths_by_format": {
+    "jxl": [
+      200,
+      1005,
+      1389,
+      1400
+    ],
+    "avif": [
+      200,
+      945,
+      1306,
+      1400
+    ],
+    "webp": [
+      200,
+      1055,
+      1400,
+      1458
+    ],
+    "jpeg": [
+      200,
+      1055,
+      1400,
+      1458
+    ]
+  },
+  "source_formats": [
+    "jxl",
+    "avif",
+    "webp"
+  ],
+  "generated_formats": [
+    "jxl",
+    "avif",
+    "webp",
+    "jpeg"
+  ],
+  "fallback_format": "jpeg",
+  "art_direction": [
+    {
+      "name": "desktop",
+      "media": "(min-width: 1200px)",
+      "sizes": "40vw",
+      "extra_transformation": null
+    },
+    {
+      "name": "laptop",
+      "media": "(min-width: 992px) and (max-width: 1199px)",
+      "sizes": "60vw",
+      "extra_transformation": "ar_16:9,c_fill,g_auto"
+    },
+    {
+      "name": "tablet",
+      "media": "(min-width: 768px) and (max-width: 991px)",
+      "sizes": "70vw",
+      "extra_transformation": "ar_4:3,c_fill,g_auto"
+    },
+    {
+      "name": "mobile",
+      "media": "(max-width: 767px)",
+      "sizes": "100vw",
+      "extra_transformation": "ar_1:1,c_fill,g_auto"
+    }
+  ],
+  "html_output": "output/cat_guffin_swim.html"
+}

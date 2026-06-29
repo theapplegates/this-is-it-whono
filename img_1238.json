@@ -1,0 +1,80 @@
+{
+  "asset_id": "9bb74700ed1ffa50b9cc6174c6a18e80",
+  "public_id": "wp1rlrmrqrg9dhlsevsi",
+  "version": 1782753079,
+  "width": 2048,
+  "height": 1150,
+  "format": "jpg",
+  "secure_url": "https://res.cloudinary.com/paulapplegate-com/image/upload/v1782753079/wp1rlrmrqrg9dhlsevsi.jpg",
+  "raw_widths_from_cloudinary": [
+    200,
+    964,
+    1400
+  ],
+  "selected_widths": [
+    200,
+    964,
+    1400
+  ],
+  "widths_by_format": {
+    "jxl": [
+      200,
+      964,
+      1400
+    ],
+    "avif": [
+      200,
+      906,
+      1400
+    ],
+    "webp": [
+      200,
+      1012,
+      1400
+    ],
+    "jpeg": [
+      200,
+      1012,
+      1400
+    ]
+  },
+  "source_formats": [
+    "jxl",
+    "avif",
+    "webp"
+  ],
+  "generated_formats": [
+    "jxl",
+    "avif",
+    "webp",
+    "jpeg"
+  ],
+  "fallback_format": "jpeg",
+  "art_direction": [
+    {
+      "name": "desktop",
+      "media": "(min-width: 1200px)",
+      "sizes": "40vw",
+      "extra_transformation": null
+    },
+    {
+      "name": "laptop",
+      "media": "(min-width: 992px) and (max-width: 1199px)",
+      "sizes": "60vw",
+      "extra_transformation": "ar_16:9,c_fill,g_auto"
+    },
+    {
+      "name": "tablet",
+      "media": "(min-width: 768px) and (max-width: 991px)",
+      "sizes": "70vw",
+      "extra_transformation": "ar_4:3,c_fill,g_auto"
+    },
+    {
+      "name": "mobile",
+      "media": "(max-width: 767px)",
+      "sizes": "100vw",
+      "extra_transformation": "ar_1:1,c_fill,g_auto"
+    }
+  ],
+  "html_output": "output/img_1238.html"
+}
