@@ -6,7 +6,7 @@ date: 2026-04-24
 tags: [ "Admin Console", "指南" ]
 draft: false
 ---
-<Picture
+<cloudinary-picture
   src="assets/images/alim-unsplash"
   alt="TODO: describe this image"
   width="4018"
@@ -17,7 +17,7 @@ draft: false
 />
 
 
-<Picture
+<cloudinary-picture
   src="assets/images/Luke"
   alt="TODO: describe this image"
   width="2048"
