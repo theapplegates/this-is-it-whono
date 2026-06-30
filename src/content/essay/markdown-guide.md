@@ -7,6 +7,40 @@ tags: [ "Markdown", "排版"]
 draft: false
 ---
 
+<picture>
+  <source
+    type="image/jxl"
+    srcset="
+    https://res.cloudinary.com/paulapplegate-com/image/upload/q_auto,f_jxl/c_scale,w_596/v1782780651/breakpoints/ezjfdcaaueqpgnkke5hn.jxl 596w,
+    https://res.cloudinary.com/paulapplegate-com/image/upload/q_auto,f_jxl/c_scale,w_916/v1782780651/breakpoints/ezjfdcaaueqpgnkke5hn.jxl 916w,
+    https://res.cloudinary.com/paulapplegate-com/image/upload/q_auto,f_jxl/c_scale,w_1344/v1782780651/breakpoints/ezjfdcaaueqpgnkke5hn.jxl 1344w,
+    https://res.cloudinary.com/paulapplegate-com/image/upload/q_auto,f_jxl/c_scale,w_1440/v1782780651/breakpoints/ezjfdcaaueqpgnkke5hn.jxl 1440w"
+    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 1440px"
+  />
+  <source
+    type="image/avif"
+    srcset="
+    https://res.cloudinary.com/paulapplegate-com/image/upload/q_auto,f_avif/c_scale,w_596/v1782780651/breakpoints/ezjfdcaaueqpgnkke5hn.avif 596w,
+    https://res.cloudinary.com/paulapplegate-com/image/upload/q_auto,f_avif/c_scale,w_916/v1782780651/breakpoints/ezjfdcaaueqpgnkke5hn.avif 916w,
+    https://res.cloudinary.com/paulapplegate-com/image/upload/q_auto,f_avif/c_scale,w_1344/v1782780651/breakpoints/ezjfdcaaueqpgnkke5hn.avif 1344w,
+    https://res.cloudinary.com/paulapplegate-com/image/upload/q_auto,f_avif/c_scale,w_1440/v1782780651/breakpoints/ezjfdcaaueqpgnkke5hn.avif 1440w"
+    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 1440px"
+  />
+  <img
+    src="https://res.cloudinary.com/paulapplegate-com/image/upload/q_auto,f_jpg/c_scale,w_800/v1782780651/breakpoints/ezjfdcaaueqpgnkke5hn.jpg"
+    srcset="
+    https://res.cloudinary.com/paulapplegate-com/image/upload/q_auto,f_jpg/c_scale,w_596/v1782780651/breakpoints/ezjfdcaaueqpgnkke5hn.jpg 596w,
+    https://res.cloudinary.com/paulapplegate-com/image/upload/q_auto,f_jpg/c_scale,w_916/v1782780651/breakpoints/ezjfdcaaueqpgnkke5hn.jpg 916w,
+    https://res.cloudinary.com/paulapplegate-com/image/upload/q_auto,f_jpg/c_scale,w_1344/v1782780651/breakpoints/ezjfdcaaueqpgnkke5hn.jpg 1344w,
+    https://res.cloudinary.com/paulapplegate-com/image/upload/q_auto,f_jpg/c_scale,w_1440/v1782780651/breakpoints/ezjfdcaaueqpgnkke5hn.jpg 1440w"
+    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 1440px"
+    alt=""
+    loading="lazy"
+    width="1440"
+    height="810"
+  />
+</picture>
+
 这篇文章展示了本主题支持的所有 Markdown 排版效果。
 
 第一段……（用于列表预览）
