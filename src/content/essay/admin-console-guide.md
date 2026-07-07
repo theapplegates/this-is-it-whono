@@ -27,6 +27,16 @@ draft: false
   picture-class="responsive-picture"
 />
 
+<cloudinary-picture
+  src="assets/images/ruben-mavarez-qqL1y15xQ9w-unsplash"
+  alt="TODO: describe this image"
+  width="2875"
+  height="1906"
+  sizes="(min-width: 768px) 720px, 100vw"
+  breakpoints="50, 335, 651, 729, 816, 951, 993, 1000"
+  picture-class="responsive-picture"
+/>
+
 
 Admin Console `/admin/`是本地后台入口，用于在 fork、clone 或自托管后接手站点配置与内容维护。
 
