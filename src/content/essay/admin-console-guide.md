@@ -6,9 +6,26 @@ date: 2026-04-24
 tags: [ "Admin Console", "指南" ]
 draft: false
 ---
+<<<<<<< HEAD
 
 <Picture
   src="assets/images/Gulfstream-G800"
+=======
+<cloudinary-picture
+  src="assets/images/Luke_cowboy"
+  alt="TODO: describe this image"
+  width="1122"
+  height="1402"
+  sizes="(min-width: 768px) 720px, 100vw"
+  breakpoints="50, 232, 349, 432, 551, 564, 667, 727, 736, 891, 918, 968, 985, 994, 1000"
+  picture-class="responsive-picture"
+/>
+
+
+
+<cloudinary-picture
+  src="assets/images/alim-unsplash"
+>>>>>>> main
   alt="TODO: describe this image"
   width="1672"
   height="941"
