@@ -6,11 +6,18 @@ date: 2026-04-24
 tags: [ "Admin Console", "指南" ]
 draft: false
 ---
-<<<<<<< HEAD
 
-<Picture
+
+<cloudinary-picture
   src="assets/images/Gulfstream-G800"
-=======
+  alt="TODO: describe this image"
+  width="1672"
+  height="941"
+  devices="1200|40|original,992|60|16:9,768|70|4:3,0|100|1:1"
+  breakpoints="50, 351, 530, 676, 812, 909, 1000"
+  picture-class="responsive-picture"
+/>
+
 <cloudinary-picture
   src="assets/images/Luke_cowboy"
   alt="TODO: describe this image"
@@ -25,7 +32,6 @@ draft: false
 
 <cloudinary-picture
   src="assets/images/alim-unsplash"
->>>>>>> main
   alt="TODO: describe this image"
   width="1672"
   height="941"
@@ -67,7 +73,7 @@ draft: false
 />
 
 
-<Picture
+<cloudinary-picture
   src="assets/images/Gulfstream-G800"
   alt="TODO: describe this image"
   width="1672"
@@ -76,6 +82,8 @@ draft: false
   breakpoints="50, 351, 530, 676, 812, 909, 1000"
   picture-class="responsive-picture"
 />
+
+
 
 Admin Console `/admin/`是本地后台入口，用于在 fork、clone 或自托管后接手站点配置与内容维护。
 
