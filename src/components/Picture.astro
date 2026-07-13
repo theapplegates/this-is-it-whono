@@ -19,12 +19,24 @@ type Transformations = Omit<
   "src" | "width" | "height" | "format"
 >;
 
+/** One art-direction device: a viewport floor, a `sizes` portion (vw), and a crop ratio. */
+type DeviceAspectRatio = string; // "original" | "16:9" | "4:3" | "1:1" | ...
+type DeviceSpec = {
+  minWidth: number; // 0 = smallest device (becomes the <img> fallback)
+  vw: number; // portion of the viewport the image occupies -> sizes
+  aspectRatio: DeviceAspectRatio; // "original" preserves the source ratio
+};
+
+type DeviceInput = DeviceSpec[] | string;
+
 type Props = {
   src: string;
   alt: string;
   width: number | string;
   height: number | string;
-  sizes: string;
+  // Either `sizes` (simple responsive) or `devices` (art direction) is required.
+  sizes?: string;
+  devices?: DeviceInput;
   // In .md posts (no MDX) this arrives as a string; in .mdx it can be an array.
   breakpoints: CloudinaryBreakpointSet | string;
   pictureClass?: string;
@@ -44,13 +56,19 @@ const {
   width,
   height,
   sizes,
+  devices,
   breakpoints,
+  // Accept both `pictureClass` (JSX) and `picture-class` (markup) so the
+  // class actually lands on the <picture> instead of leaking onto <img>.
   pictureClass,
+  "picture-class": pictureClassKebab,
   transformations = {},
   loading = "lazy",
   decoding = "async",
   ...attrs
 } = Astro.props;
+
+const pictureClassName = pictureClass ?? pictureClassKebab;
 
 if (!alt) {
   throw new Error(`Cloudinary <Picture> requires an alt for src: "${src}".`);
@@ -83,6 +101,55 @@ function toBreakpointList(
   return Array.isArray(input) ? input : input.breakpoints;
 }
 
+// Accept a DeviceSpec[], a JSON array string, or a compact
+// "minWidth|vw|aspectRatio,..." string (e.g. "1200|40|original,992|60|16:9").
+function toDeviceList(input: DeviceInput | undefined): DeviceSpec[] | undefined {
+  if (input === undefined || input === null || input === "") return undefined;
+  if (Array.isArray(input)) {
+    return input
+      .map((d) => ({
+        minWidth: Number(d.minWidth ?? (d as Record<string, unknown>).min_width),
+        vw: Number(d.vw),
+        aspectRatio:
+          String(d.aspectRatio ?? (d as Record<string, unknown>).ratio ?? "original") ||
+          "original",
+      }))
+      .filter(
+        (d) =>
+          Number.isFinite(d.minWidth) &&
+          d.minWidth >= 0 &&
+          Number.isFinite(d.vw) &&
+          d.vw > 0
+      );
+  }
+  const trimmed = (input as string).trim();
+  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+    try {
+      const parsed: unknown = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return toDeviceList(parsed as DeviceSpec[]);
+    } catch {
+      /* fall through to compact parse */
+    }
+  }
+  return trimmed
+    .split(",")
+    .map((part) => {
+      const seg = part.trim().split("|");
+      return {
+        minWidth: Number(seg[0]),
+        vw: Number(seg[1]),
+        aspectRatio: (seg[2] ?? "").trim() || "original",
+      };
+    })
+    .filter(
+      (d) =>
+        Number.isFinite(d.minWidth) &&
+        d.minWidth >= 0 &&
+        Number.isFinite(d.vw) &&
+        d.vw > 0
+    );
+}
+
 const breakpointList = toBreakpointList(breakpoints);
 
 if (!breakpointList || breakpointList.length === 0) {
@@ -110,37 +177,174 @@ if (normalizedBreakpoints.length === 0) {
   );
 }
 
-const createUrl = (format: CloudinaryFormat, breakpointWidth: number) =>
+const deviceList = toDeviceList(devices);
+const hasDevices = !!deviceList && deviceList.length > 0;
+
+if (!hasDevices && (!sizes || String(sizes).trim() === "")) {
+  throw new Error(
+    `Cloudinary <Picture> for src: "${src}" needs either "sizes" or "devices". Pass "devices" for art direction (run npm run cloudinary:breakpoints).`
+  );
+}
+
+// Per-device Cloudinary transform. "original" keeps the source ratio (limit);
+// any "W:H" ratio crops with fill + auto gravity for a smart focal point.
+function deviceTransformations(device: DeviceSpec): Transformations {
+  if (!device.aspectRatio || device.aspectRatio === "original") {
+    return { crop: "limit" };
+  }
+  return {
+    crop: "fill",
+    aspectRatio: device.aspectRatio as Transformations["aspectRatio"],
+    gravity: "auto" as Transformations["gravity"],
+  };
+}
+
+// Largest width we can request for a device's crop without upscaling the
+// source (clamps by the ratio's shorter side).
+function maxDeviceWidth(device: DeviceSpec): number {
+  if (!device.aspectRatio || device.aspectRatio === "original") {
+    return intrinsicWidth;
+  }
+  const match = device.aspectRatio.match(/^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/);
+  if (match) {
+    const w = Number(match[1]);
+    const h = Number(match[2]);
+    return Math.min(intrinsicWidth, Math.round((intrinsicHeight * w) / h));
+  }
+  return intrinsicWidth;
+}
+
+// Pixel height for a given width once a crop ratio is applied (drives the
+// <img> fallback dimensions so the box reserves the right space, no CLS).
+function ratioHeight(
+  targetWidth: number,
+  aspectRatio: DeviceAspectRatio,
+  sourceWidth: number,
+  sourceHeight: number
+): number {
+  if (!aspectRatio || aspectRatio === "original") {
+    return Math.round((targetWidth * sourceHeight) / sourceWidth);
+  }
+  const match = aspectRatio.match(/^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/);
+  if (match) {
+    return Math.round((targetWidth * Number(match[2])) / Number(match[1]));
+  }
+  return Math.round((targetWidth * sourceHeight) / sourceWidth);
+}
+
+// Build the `sizes` string from devices (largest viewport first, smallest as
+// the bare fallback), mirroring the script's buildSizes().
+function buildSizesFromDevices(list: DeviceSpec[]): string {
+  const sorted = [...list].sort((a, b) => a.minWidth - b.minWidth);
+  const smallest = sorted[0];
+  const rest = sorted.slice(1).sort((a, b) => b.minWidth - a.minWidth);
+  const clauses = rest.map((d) => `(min-width: ${d.minWidth}px) ${d.vw}vw`);
+  return [...clauses, `${smallest.vw}vw`].join(", ");
+}
+
+const createUrl = (
+  format: CloudinaryFormat,
+  breakpointWidth: number,
+  extraTransforms: Transformations = {}
+) =>
   getCldImageUrl({
     crop: "limit",
     quality: "auto",
     ...transformations,
+    ...extraTransforms,
     src,
     width: breakpointWidth,
     format,
   });
 
-const createSrcSet = (format: CloudinaryFormat) =>
+const createSrcSet = (
+  format: CloudinaryFormat,
+  extraTransforms: Transformations = {}
+) =>
   normalizedBreakpoints
-    .map((breakpointWidth) => `${createUrl(format, breakpointWidth)} ${breakpointWidth}w`)
+    .map(
+      (breakpointWidth) =>
+        `${createUrl(format, breakpointWidth, extraTransforms)} ${breakpointWidth}w`
+    )
     .join(", ");
 
-const fallbackSrc = createUrl("webp", intrinsicWidth);
+// Widths available for a device's crop (no upscaling past the source).
+const deviceWidths = (device: DeviceSpec) => {
+  const cap = maxDeviceWidth(device);
+  const widths = normalizedBreakpoints.filter((w) => w <= cap);
+  return widths.length > 0 ? widths : [Math.min(intrinsicWidth, cap)];
+};
+
+const createDeviceSrcSet = (format: CloudinaryFormat, device: DeviceSpec) =>
+  deviceWidths(device)
+    .map(
+      (breakpointWidth) =>
+        `${createUrl(format, breakpointWidth, deviceTransformations(device))} ${breakpointWidth}w`
+    )
+    .join(", ");
+
+// --- Simple responsive mode (single crop, one srcset per format) ---
+const simpleSizes = sizes ? String(sizes) : "";
+const simpleFallbackSrc = createUrl("webp", intrinsicWidth);
+
+// --- Art-direction mode (per-device crops via <source media>) ---
+let artSizes = "";
+let fallbackSrc = simpleFallbackSrc;
+let fallbackWidth = intrinsicWidth;
+let fallbackHeight = intrinsicHeight;
+let artSources:
+  | { media: string; type: string; sizes: string; srcset: string }[]
+  | undefined;
+
+if (hasDevices && deviceList) {
+  const sortedAsc = [...deviceList].sort((a, b) => a.minWidth - b.minWidth);
+  const smallestDevice = sortedAsc[0];
+  const sourceDevices = sortedAsc.slice(1).sort((a, b) => b.minWidth - a.minWidth);
+
+  artSizes = buildSizesFromDevices(deviceList);
+  artSources = sourceDevices.flatMap((d) =>
+    FORMAT_ORDER.map((format) => ({
+      media: `(min-width: ${d.minWidth}px)`,
+      type: MIME_TYPES[format],
+      sizes: artSizes,
+      srcset: createDeviceSrcSet(format, d),
+    }))
+  );
+
+  fallbackWidth = Math.min(intrinsicWidth, maxDeviceWidth(smallestDevice));
+  fallbackSrc = createUrl("webp", fallbackWidth, deviceTransformations(smallestDevice));
+  fallbackHeight = ratioHeight(
+    fallbackWidth,
+    smallestDevice.aspectRatio,
+    intrinsicWidth,
+    intrinsicHeight
+  );
+}
 ---
 
-<picture class={pictureClass}>
+<picture class={pictureClassName}>
   {
-    FORMAT_ORDER.map((format) => (
-      <source type={MIME_TYPES[format]} sizes={sizes} srcset={createSrcSet(format)} />
-    ))
+    hasDevices && artSources ? (
+      artSources.map((s) => (
+        <source type={s.type} media={s.media} sizes={s.sizes} srcset={s.srcset} />
+      ))
+    ) : (
+      FORMAT_ORDER.map((format) => (
+        <source
+          type={MIME_TYPES[format]}
+          sizes={simpleSizes}
+          srcset={createSrcSet(format)}
+        />
+      ))
+    )
   }
   <img
     {...attrs}
-    src={fallbackSrc}
+    src={hasDevices ? fallbackSrc : simpleFallbackSrc}
     alt={alt}
-    width={intrinsicWidth}
-    height={intrinsicHeight}
-    sizes={sizes}
+    width={hasDevices ? fallbackWidth : intrinsicWidth}
+    height={hasDevices ? fallbackHeight : intrinsicHeight}
+    sizes={hasDevices ? artSizes : simpleSizes}
     loading={loading}
     decoding={decoding}
   />

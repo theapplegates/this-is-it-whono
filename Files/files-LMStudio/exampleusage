@@ -1,0 +1,9 @@
+<Picture
+  src="assets/images/annie-spratt-5dYFyY_mAzQ-unsplash"
+  alt="A beautiful sunset over the mountains"
+  width="5165"
+  height="3561"
+  sizes="(min-width: 768px) 720px, 100vw"
+  breakpoints="200, 575, 907, 1132, 1354, 1573, 1789, 1927, 1951, 2000"
+  picture-class="responsive-picture"
+/>

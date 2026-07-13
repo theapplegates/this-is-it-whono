@@ -2,25 +2,35 @@
 /**
  * Upload an image to Cloudinary, request responsive breakpoints, merge the
  * resulting widths into src/data/cloudinary-breakpoints.json, and print a
- * ready-to-paste <cloudinary-picture> snippet (intrinsic width/height pulled
- * from the upload response) to stdout.
+ * ready-to-paste <Picture> snippet (intrinsic width/height pulled from the
+ * upload response) plus its import line to stdout.
  *
  * Usage:
  *   npm run cloudinary:breakpoints -- src/assets/images/my-photo.jpg
+ *   npm run cloudinary:breakpoints -- src/assets/images/my-photo.jpg --sizes="100vw"
+ *
+ * With no --devices / --sizes flag the script shows device checkboxes
+ * (Desktop / Laptop / Tablet / Phone) and emits an art-direction `devices`
+ * string (per-device crops + a derived `sizes`). Press Enter to include all,
+ * or type a custom sizes string for simple responsive mode. --devices="..." or
+ * --sizes="..." skips the prompt. In a non-interactive shell all devices are
+ * used. These only affect the printed snippet, not the upload.
  *
  * The Cloudinary public ID is derived from the file path by dropping the
  * leading "src/" segment and the file extension, e.g.
  *   src/assets/images/my-photo.jpg -> assets/images/my-photo
  *
- * Requires CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET
- * in .env (or the surrounding process environment). The build does NOT need the
- * API key/secret -- only this upload script does.
+ * Credentials are read from .env via Node's --env-file-if-exists flag (see
+ * package.json), or from the surrounding process environment. The build does
+ * NOT need the API key/secret -- only this upload script does.
  */
 import { createRequire } from "node:module";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, extname, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import * as readline from "node:readline/promises";
+import { stdin, stdout } from "node:process";
 
 const require = createRequire(import.meta.url);
 const cloudinary = require("cloudinary").v2;
@@ -28,27 +38,116 @@ const cloudinary = require("cloudinary").v2;
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const BREAKPOINTS_FILE = resolve(ROOT, "src/data/cloudinary-breakpoints.json");
 
-/** Minimal .env loader so this script has no extra dependency. */
-async function loadEnv() {
-  const envPath = resolve(ROOT, ".env");
-  if (!existsSync(envPath)) return;
-  const text = await readFile(envPath, "utf8");
-  for (const line of text.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq === -1) continue;
-    const key = trimmed.slice(0, eq).trim();
-    let value = trimmed.slice(eq + 1).trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
+/**
+ * Device-based art-direction presets. Each device has a viewport floor
+ * (minWidth), the portion of the viewport the image occupies (vw -> sizes),
+ * and a crop aspect ratio. minWidth 0 is the smallest device and becomes the
+ * <img> fallback crop.
+ */
+const DEVICE_PRESETS = [
+  { key: "desktop", label: "Desktop  >1200px",  minWidth: 1200, vw: 40,  aspectRatio: "original" },
+  { key: "laptop",  label: "Laptop   992-1199", minWidth: 992,  vw: 60,  aspectRatio: "16:9" },
+  { key: "tablet",  label: "Tablet   768-991",  minWidth: 768,  vw: 70,  aspectRatio: "4:3" },
+  { key: "phone",   label: "Phone    <768",     minWidth: 0,    vw: 100, aspectRatio: "1:1" },
+];
+
+function parseArgs(argv) {
+  let filePath = null;
+  let sizesArg = null;
+  let devicesArg = null;
+  for (const arg of argv.slice(2)) {
+    if (arg === "--") continue;
+    if (arg.startsWith("--sizes=")) {
+      sizesArg = arg.slice("--sizes=".length);
+    } else if (arg.startsWith("--devices=")) {
+      devicesArg = arg.slice("--devices=".length);
+    } else if (!filePath) {
+      filePath = arg;
     }
-    // Don't clobber real environment variables.
-    if (!(key in process.env)) process.env[key] = value;
   }
+  return { filePath, sizesArg, devicesArg };
+}
+
+/** `sizes` string from a device selection (largest viewport first). */
+function buildSizes(selected) {
+  const sorted = [...selected].sort((a, b) => a.minWidth - b.minWidth);
+  const smallest = sorted[0];
+  const rest = sorted.slice(1).sort((a, b) => b.minWidth - a.minWidth);
+  const clauses = rest.map((d) => `(min-width: ${d.minWidth}px) ${d.vw}vw`);
+  return [...clauses, `${smallest.vw}vw`].join(", ");
+}
+
+/** Compact `devices` string for the <Picture> prop: "minWidth|vw|aspectRatio,...". */
+function buildDevicesString(selected) {
+  return selected.map((d) => `${d.minWidth}|${d.vw}|${d.aspectRatio}`).join(",");
+}
+
+/** Parse a compact "minWidth|vw|aspectRatio,..." string into device specs. */
+function parseDevicesString(input) {
+  return input
+    .split(",")
+    .map((part) => {
+      const seg = part.trim().split("|");
+      return {
+        minWidth: Number(seg[0]),
+        vw: Number(seg[1]),
+        aspectRatio: (seg[2] ?? "").trim() || "original",
+      };
+    })
+    .filter(
+      (d) =>
+        Number.isFinite(d.minWidth) &&
+        d.minWidth >= 0 &&
+        Number.isFinite(d.vw) &&
+        d.vw > 0
+    );
+}
+
+/**
+ * Returns either { mode: "art", devices } (art direction) or
+ * { mode: "sizes", sizes } (simple responsive). --devices / --sizes skip the
+ * prompt; a non-numeric custom answer becomes a plain sizes string.
+ */
+async function chooseDevices(sizesArg, devicesArg) {
+  if (devicesArg) {
+    const parsed = parseDevicesString(devicesArg);
+    if (parsed.length > 0) return { mode: "art", devices: parsed };
+  }
+  if (sizesArg) return { mode: "sizes", sizes: sizesArg };
+
+  console.log("\nArt direction (check the device ranges to include):");
+  DEVICE_PRESETS.forEach((d, i) => {
+    console.log(`  [x] ${i + 1}) ${d.label}   ${d.aspectRatio}   ${d.vw}vw`);
+  });
+
+  if (!stdin.isTTY) return { mode: "art", devices: DEVICE_PRESETS };
+
+  const rl = readline.createInterface({ input: stdin, output: stdout });
+  let answer;
+  try {
+    answer = await rl.question(
+      "Enter numbers to include, comma-separated (Enter = all, or type a custom sizes): "
+    );
+  } finally {
+    rl.close();
+  }
+  const trimmed = answer.trim();
+  if (!trimmed) return { mode: "art", devices: DEVICE_PRESETS };
+
+  const nums = trimmed.split(",").map((t) => t.trim()).filter(Boolean);
+  if (nums.length > 0 && nums.every((n) => /^\d+$/.test(n))) {
+    const selected = [];
+    for (const n of nums) {
+      const idx = Number(n) - 1;
+      if (idx >= 0 && idx < DEVICE_PRESETS.length) {
+        const d = DEVICE_PRESETS[idx];
+        if (!selected.includes(d)) selected.push(d);
+      }
+    }
+    if (selected.length > 0) return { mode: "art", devices: selected };
+  }
+  // Not a number list -> treat as a custom sizes string (simple responsive).
+  return { mode: "sizes", sizes: trimmed };
 }
 
 /** src/assets/images/my-photo.jpg -> assets/images/my-photo */
@@ -74,13 +173,13 @@ async function writeBreakpoints(data) {
 }
 
 async function main() {
-  const filePath = process.argv[2];
+  const { filePath, sizesArg, devicesArg } = parseArgs(process.argv);
   if (!filePath) {
-    console.error("Usage: npm run cloudinary:breakpoints -- <path-to-image>");
+    console.error(
+      "Usage: npm run cloudinary:breakpoints -- <path-to-image> [--devices=\"...\"] [--sizes=\"...\"]"
+    );
     process.exit(1);
   }
-
-  await loadEnv();
 
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
   const apiKey = process.env.CLOUDINARY_API_KEY;
@@ -116,7 +215,7 @@ async function main() {
         breakpoints: {
           min_width: 200,
           max_width: 2000,
-          max_images: 6,
+          max_images: 10,
           auto_optimal_breakpoints: true,
         },
       },
@@ -143,26 +242,60 @@ async function main() {
   );
   console.log(sorted.join(", "));
 
-  // Intrinsic dimensions come from the upload response. The rehype plugin
-  // reads width/height/sizes/breakpoints/picture-class off the element and
-  // builds JXL -> AVIF -> WebP sources + a WebP <img> fallback. Replace the
-  // alt text (the plugin rejects an empty alt) before publishing.
+  // Intrinsic dimensions come from the upload response. The Picture.astro
+  // component reads src/alt/width/height/breakpoints plus either `devices`
+  // (art direction: per-device crops via <source media>) or `sizes` (simple
+  // responsive). It rejects an empty alt, so replace the alt text before
+  // publishing.
   const intrinsicWidth = result.width;
   const intrinsicHeight = result.height;
-  const snippet = [
-    `<cloudinary-picture`,
-    `  src="${publicId}"`,
-    `  alt="TODO: describe this image"`,
-    `  width="${intrinsicWidth}"`,
-    `  height="${intrinsicHeight}"`,
-    `  sizes="(min-width: 768px) 720px, 100vw"`,
-    `  breakpoints="${sorted.join(", ")}"`,
-    `  picture-class="responsive-picture"`,
-    `/>`,
-  ].join("\n");
+  const choice = await chooseDevices(sizesArg, devicesArg);
+  // Import path is relative to a typical post at src/content/blog/<slug>/index.mdx.
+  const importLine = `import Picture from "../../../components/Picture.astro";`;
 
-  console.log("\nPaste this into your .md post (replace the alt text):\n");
+  let snippet;
+  if (choice.mode === "art") {
+    const devicesStr = buildDevicesString(choice.devices);
+    const sizesForReference = buildSizes(choice.devices);
+    snippet = [
+      `<Picture`,
+      `  src="${publicId}"`,
+      `  alt="TODO: describe this image"`,
+      `  width="${intrinsicWidth}"`,
+      `  height="${intrinsicHeight}"`,
+      `  devices="${devicesStr}"`,
+      `  breakpoints="${sorted.join(", ")}"`,
+      `  picture-class="responsive-picture"`,
+      `/>`,
+    ].join("\n");
+    console.log(`sizes (derived): ${sizesForReference}`);
+    console.log(`devices: ${devicesStr}`);
+  } else {
+    snippet = [
+      `<Picture`,
+      `  src="${publicId}"`,
+      `  alt="TODO: describe this image"`,
+      `  width="${intrinsicWidth}"`,
+      `  height="${intrinsicHeight}"`,
+      `  sizes="${choice.sizes}"`,
+      `  breakpoints="${sorted.join(", ")}"`,
+      `  picture-class="responsive-picture"`,
+      `/>`,
+    ].join("\n");
+    console.log(`sizes: ${choice.sizes}`);
+  }
+
+  console.log("\nPaste this into your .mdx post (replace the alt text).");
+  console.log("Put the import once at the top of the file, after the frontmatter;");
+  console.log("then place the <Picture> tag where the image should appear:\n");
+  console.log(importLine);
+  console.log("");
   console.log(snippet);
+  console.log("");
+  console.log(
+    "Note: the import path is relative to src/content/blog/<slug>/index.mdx;"
+  );
+  console.log("adjust the ../ count if your post lives at a different depth.");
   console.log("");
 }
 
