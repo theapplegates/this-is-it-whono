@@ -6,6 +6,16 @@ tags: ["代码", "测试"]
 draft: false
 ---
 
+<cloudinary-picture
+  src="assets/images/kristina-bekher-9wwv1DCUsKM-unsplash"
+  alt="TODO: describe this image"
+  width="2075"
+  height="3130"
+  sizes="(min-width: 768px) 720px, 100vw"
+  breakpoints="50, 295, 373, 464, 525, 581, 629, 675, 718, 757, 796, 834, 866, 900, 940, 980, 999, 1000"
+  picture-class="responsive-picture"
+/>
+
 本文测试主题对各种编程语言的代码高亮支持。
 
 ## TypeScript

@@ -6,13 +6,37 @@ date: 2026-04-24
 tags: [ "Admin Console", "指南" ]
 draft: false
 ---
+
+
+<cloudinary-picture
+  src="assets/images/Gulfstream-G800"
+  alt="TODO: describe this image"
+  width="1672"
+  height="941"
+  devices="1200|40|original,992|60|16:9,768|70|4:3,0|100|1:1"
+  breakpoints="50, 351, 530, 676, 812, 909, 1000"
+  picture-class="responsive-picture"
+/>
+
+<cloudinary-picture
+  src="assets/images/Luke_cowboy"
+  alt="TODO: describe this image"
+  width="1122"
+  height="1402"
+  sizes="(min-width: 768px) 720px, 100vw"
+  breakpoints="50, 232, 349, 432, 551, 564, 667, 727, 736, 891, 918, 968, 985, 994, 1000"
+  picture-class="responsive-picture"
+/>
+
+
+
 <cloudinary-picture
   src="assets/images/alim-unsplash"
   alt="TODO: describe this image"
-  width="4018"
-  height="3014"
-  sizes="(min-width: 768px) 720px, 100vw"
-  breakpoints="50, 402, 604, 715, 786, 873, 879, 1000"
+  width="1672"
+  height="941"
+  devices="1200|40|original,992|60|16:9,768|70|4:3,0|100|1:1"
+  breakpoints="50, 351, 530, 676, 812, 909, 1000"
   picture-class="responsive-picture"
 />
 
@@ -48,6 +72,29 @@ Last test image.
   breakpoints="50, 245, 357, 452, 543, 608, 669, 727, 782, 822, 849, 948, 992, 995, 1000"
   picture-class="responsive-picture"
 />
+
+<cloudinary-picture
+  src="assets/images/alexander-mass-Y4VMzlU2OqQ-unsplash"
+  alt="TODO: describe this image"
+  width="4000"
+  height="6000"
+  sizes="(min-width: 768px) 720px, 100vw"
+  breakpoints="50, 247, 417, 450, 570, 647, 740, 787, 850, 909, 965, 998, 999, 1000"
+  picture-class="responsive-picture"
+/>
+
+
+<cloudinary-picture
+  src="assets/images/Gulfstream-G800"
+  alt="TODO: describe this image"
+  width="1672"
+  height="941"
+  devices="1200|40|original,992|60|16:9,768|70|4:3,0|100|1:1"
+  breakpoints="50, 351, 530, 676, 812, 909, 1000"
+  picture-class="responsive-picture"
+/>
+
+
 
 Admin Console `/admin/`是本地后台入口，用于在 fork、clone 或自托管后接手站点配置与内容维护。
 
