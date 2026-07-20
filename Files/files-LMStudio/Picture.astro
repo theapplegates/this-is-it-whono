@@ -1,0 +1,145 @@
+---
+/**
+ * Picture.astro
+ * A responsive image component for Cloudinary
+ */
+import type { HTMLAttributes } from "astro/types";
+import {
+  getCldImageUrl,
+  type GetCldImageUrlOptions,
+} from "astro-cloudinary/helpers";
+
+// 1. TYPES DEFINITIONS
+type CloudinaryFormat = "jxl" | "avif" | "webp";
+type CloudinaryBreakpoint =
+  | number
+  | {
+    width: number;
+  };
+type CloudinaryBreakpointSet =
+  | CloudinaryBreakpoint[]
+  | {
+    breakpoints: CloudinaryBreakpoint[];
+  };
+type ImageAttrs = Omit(
+  HTMLAttributes<"img">,
+  "src" | "srcset" | "alt" | "width" | "height" | "sizes"
+);
+type Transformations = Omit(
+  GetCldImageUrlOptions,
+  "src" | "width" | "height" | "format"
+);
+
+type Props = {
+  src: string;
+  alt: string;
+  width: number;
+  height: number;
+  sizes: string;
+  breakpoints: CloudinaryBreakpointSet;
+  pictureClass?: string;
+  transformations?: Transformations;
+} & ImageAttrs;
+
+// 2. CONSTANTS
+const FORMAT_ORDER: CloudinaryFormat[] = ["jxl", "avif", "webp"];
+const MIME_TYPES: Record<CloudinaryFormat, string> = {
+  jxl: "image/jxl",
+  avif: "image/avif",
+  webp: "image/webp",
+};
+
+// 3. PROPS EXTRACTION
+const {
+  src,
+  alt,
+  width,
+  height,
+  sizes,
+  breakpoints: rawBreakpoints,
+  pictureClass,
+  transformations = {},
+  loading = "lazy",
+  decoding = "async",
+  ...attrs
+} = Astro.props;
+
+// Handle the case where Markdown passes 'picture-class' instead of 'pictureClass'
+const finalPictureClass = pictureClass || Astro.props["picture-class"];
+
+// 4. BREAKPOINT PROCESSING LOGIC
+// This section handles the "string vs array" issue so your images actually load.
+let breakpointList: number[] = [];
+
+if (Array.isArray(rawBreakpoints)) {
+  // If it's already an array
+  breakpointList = rawBreakpoints;
+} else if (typeof rawBreakpoints === "string") {
+  // If it's a string like "200, 575, 907", convert it to [200, 575, 907]
+  breakpointList = rawBreakpoints
+    .split(",")
+    .map((b) => Number(b.trim()))
+    .filter((n) => !isNaN(n));
+} else if (rawBreakpoints && typeof rawBreakpoints.breakpoints === "object") {
+  // If it's an object with a breakpoints property
+  breakpointList = rawBreakpoints.breakpoints;
+}
+
+// Error checking to help you debug if you forget to run the script
+if (breakpointList.length === 0) {
+  throw new Error(
+    `Cloudinary breakpoints are missing for src: "${src}". Please run "npm run cloudinary:breakpoints ${src}" in your terminal.`
+  );
+}
+
+// Create a clean, sorted list of unique widths including the original width
+const normalizedBreakpoints = [
+  ...new Set(
+    breakpointList
+      .map((b) => (typeof b === "number" ? b : b.width))
+      .filter((w) => Number.isFinite(w) && w > 0)
+      .concat(width)
+  ),
+].sort((a, b) => a - b);
+
+// 5. URL GENERATION FUNCTIONS
+const createUrl = (format: CloudinaryFormat, breakpoint: number) =>
+  getCldImageUrl({
+    crop: "limit",
+    quality: "auto",
+    ...transformations,
+    src,
+    width: breakpoint,
+    format,
+  });
+
+const createSrcSet = (format: CloudinaryFormat) =>
+  normalizedBreakpoints
+    .map((breakpoint) => `${createUrl(format, breakpoint)} ${breakpoint}w`)
+    .join(", ");
+
+const fallbackSrc = createUrl("webp", width);
+---
+
+<picture class={finalPictureClass}>
+  {
+  FORMAT_ORDER.map(format => (
+    <source
+      key={format}
+      type={MIME_TYPES[format]}
+      sizes={sizes}
+      srcset={createSrcSet(format)}
+    />
+  ))
+  }
+  <img
+    {...attrs}
+    src={fallbackSrc}
+    alt={alt}
+    width={width}
+    height={height}
+    sizes={sizes}
+    loading={loading}
+    decoding={decoding}
+  />
+</picture>

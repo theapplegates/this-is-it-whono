@@ -37,6 +37,17 @@ draft: false
   picture-class="responsive-picture"
 />
 
+Last test image.
+
+<cloudinary-picture
+  src="assets/images/mirjam-schuinder-5j8bf62-SmQ-unsplash"
+  alt="TODO: describe this image"
+  width="2592"
+  height="3888"
+  devices="1200|40|original,992|60|16:9,768|70|4:3,0|100|1:1"
+  breakpoints="50, 245, 357, 452, 543, 608, 669, 727, 782, 822, 849, 948, 992, 995, 1000"
+  picture-class="responsive-picture"
+/>
 
 Admin Console `/admin/`是本地后台入口，用于在 fork、clone 或自托管后接手站点配置与内容维护。
 
